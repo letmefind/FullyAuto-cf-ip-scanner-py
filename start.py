@@ -29,9 +29,6 @@ except ImportError:
 # Main function
 def main():
 
-    # Check for custom config file in command-line arguments
-    customconfig = False if len(sys.argv) <= 1 else os.path.exists(sys.argv[1])
-
     DEFAULT_MAX_IP = 50
     DEFAULT_MAX_PING = 500
     DEFAULT_MAX_JITTER = 100
@@ -44,7 +41,7 @@ def main():
 
     # Create a new configparser instance and load the configuration file
     config = configparser.ConfigParser()
-    config.read(sys.argv[1] if customconfig else 'config.ini')
+    config.read('config.ini')
 
     # Get the values of the configuration variables, using default values if not available
     max_ip = int(config.get('DEFAULT', 'max_ip', fallback=DEFAULT_MAX_IP))
@@ -53,9 +50,9 @@ def main():
     max_latency = int(config.get('DEFAULT', 'max_latency', fallback=DEFAULT_MAX_LATENCY))
     ip_include = config.get('DEFAULT', 'ip_include', fallback=DEFAULT_IP_INCLUDE)
     ip_exclude = config.get('DEFAULT', 'ip_exclude', fallback=DEFAULT_IP_EXCLUDE)
-    test_size = config.get('DEFAULT', 'test_size', fallback=DEFAULT_DOWNLOAD_SIZE_KB)
-    min_download_speed = config.get('DEFAULT', 'min_download_speed', fallback=DEFAULT_MIN_DOWNLOAD_SPEED)
-    min_upload_speed = config.get('DEFAULT', 'min_upload_speed', fallback=DEFAULT_MIN_UPLOAD_SPEED)
+    test_size = int(config.get('DEFAULT', 'test_size', fallback=DEFAULT_DOWNLOAD_SIZE_KB))
+    min_download_speed = float(config.get('DEFAULT', 'min_download_speed', fallback=DEFAULT_MIN_DOWNLOAD_SPEED))
+    min_upload_speed = float(config.get('DEFAULT', 'min_upload_speed', fallback=DEFAULT_MIN_UPLOAD_SPEED))
     upload_results = config.get('DEFAULT', 'upload_results', fallback='no')
     delete_existing = config.get('DEFAULT', 'delete_existing', fallback='yes')
     email = config.get('DEFAULT', 'email', fallback='')
@@ -68,7 +65,6 @@ def main():
     global openssl_is_active
 
     # Initialise the required variables
-    delete_existing = 'yes'
     cidr_list = []
     ip_list = []
     include_regex = ''
@@ -76,96 +72,12 @@ def main():
 
     print("Press CTRL+C to exit...\n")
 
-
     try:
-
-        # If no custom config file was specified...
-        if not customconfig:
-
-            # Prompt user for input with default values from configuration file
-            max_ip = input(f"Enter max IP [{max_ip}]: ") or max_ip
-            max_ping = input(f"Enter max ping [{max_ping}]: ") or max_ping
-            max_jitter = input(f"Enter max jitter [{max_jitter}]: ") or max_jitter
-            max_latency = input(f"Enter max latency [{max_latency}]: ") or max_latency
-            ip_include = input(f"Enter IPs to include (comma seperated, '-' to ignore) [{ip_include}]: ") or ip_include
-            ip_exclude = input(f"Enter IPs to exclude (comma seperated, '-' to ignore) [{ip_exclude}]: ") or ip_exclude
-            test_size = input(f"Enter test data size in KB [{test_size}]: ") or test_size
-            min_download_speed = input(f"Enter minimum download speed (Mbps) [{min_download_speed}]: ") or min_download_speed
-            min_upload_speed = input(f"Enter minimum upload speed (Mbps) [{min_upload_speed}]: ") or min_upload_speed
-
-            # Clear the include regex in case "-" provided by the user
-            if ip_include == '-':
-                ip_include = ''
-
-            # Clear the exclude regex in case "-" provided by the user
-            if ip_exclude == '-':
-                ip_exclude = ''
-
-            # Convert the inputs to the appropriate types in related variables
-            max_ip = int(max_ip)
-            max_ping = int(max_ping)
-            max_jitter = int(max_jitter)
-            max_latency = int(max_latency)
-            test_size = int(test_size)
-            min_download_speed = float(min_download_speed)
-            min_upload_speed = float(min_upload_speed)
-
-
-            # Prompt the user for whether they want to upload the result to their Cloudflare subdomain
-            upload_results = input(f"Do you want to upload the result to your Cloudflare subdomain (yes/no) [{upload_results}]? ") or upload_results
-
-            # Code block to execute if upload_results is 'y' or 'yes'
-            if upload_results.lower() in ["y", "yes"]:
-                delete_existing = input(f"Do you want to delete extisting records of given subdomain before uploading the result to your Cloudflare (yes/no) [{delete_existing}]? ") or delete_existing
-                email = input(f"Cloudflare email [{email}]: ") or email
-                zone_id = input(f"Cloudflare zone ID [{zone_id}]: ") or zone_id
-                api_key = input(f"Cloudflare API key [{api_key}]: ") or api_key
-
-                # Prompt user to enter subdomain to modify
-                subdomain = input(f"Subdomain to modify (i.e ip.my-domain.com) [{subdomain}]: ") or subdomain
-
-                # Check if provided credentials are correct and retry if they are not
-                while not validateCloudflareCredentials(email, api_key, zone_id):
-                    print("Invalid cloudflare credentials, please try again.")
-                    email = input(f"Cloudflare email [{email}]: ") or email
-                    zone_id = input(f"Cloudflare zone ID [{zone_id}]: ") or zone_id
-                    api_key = input(f"Cloudflare API key [{api_key}]: ") or api_key
-
-
-                # Use regular expression to validate subdomain format
-                while not re.match(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}$", subdomain):
-                    # If subdomain is invalid, prompt user to try again
-                    print("Invalid subdomain, please try again.")
-                    subdomain = input(f"Subdomain to modify (i.e ip.my-domain.com) [{subdomain}]: ") or subdomain
-
-            # Update config variable with given data from user
-            config['DEFAULT'] = {
-                'max_ip': str(max_ip),
-                'max_ping': str(max_ping),
-                'max_jitter': str(max_jitter),
-                'max_latency': str(max_latency),
-                'ip_include': ip_include,
-                'ip_exclude': ip_exclude,
-                'test_size': test_size,
-                'min_download_speed': min_download_speed,
-                'min_upload_speed': min_upload_speed,
-                'upload_results': upload_results,
-                'delete_existing': delete_existing,
-                'email': email,
-                'zone_id': zone_id,
-                'api_key': api_key,
-                'subdomain': subdomain
-            }
-
-            # Saving the configuration info to config file for further use
-            with open('config.ini', 'w') as configfile:
-                config.write(configfile)
-
-        # Convert IP ranges to include (provided by user in a comma-seperated string) to Regular Expression
+        # Convert IP ranges to include (provided by user in a comma-separated string) to Regular Expression
         if ip_include:
             include_regex = re.compile('|'.join(['^' + re.escape(c).replace('.', '\\.') + '\\.' for c in ip_include.split(',')]))
 
-        # Convert IP ranges to exclude (provided by user in a comma-seperated string) to Regular Expression
+        # Convert IP ranges to exclude (provided by user in a comma-separated string) to Regular Expression
         if ip_exclude:
             exclude_regex = re.compile('|'.join(['^' + re.escape(c).replace('.', '\\.') + '\\.' for c in ip_exclude.split(',')]))
 
@@ -195,11 +107,11 @@ def main():
                 ip_list = ip_list + processCIDR(cidr)
 
 
-        # Shuffling the IP list in order to test different ip in different ranges by random
+        # Shuffling the IP list in order to test different IPs in different ranges by random
         print(f"\nShuffling the IPs...", end='')
         random.shuffle(ip_list)
 
-        # Preparation is done 
+        # Preparation is done
         print("Done.")
     except KeyboardInterrupt:
         # Print proper message and exit the script in case user pressed CTRL+C
@@ -218,29 +130,29 @@ def main():
     if has_openssl():
         openssl_is_active = True
     else:
-        print("OpenSSL is not installed! You man install it to your system and try again.")
+        print("OpenSSL is not installed! You may install it on your system and try again.")
         openssl_is_active = False
 
     # Start testing clean IPs
-    selectd_ip_list, total_test = curses.wrapper(startTest, ip_list=ip_list, config=config)
+    selected_ip_list, total_test = curses.wrapper(startTest, ip_list=ip_list, config=config)
 
-    print(f"\n{total_test} of {len(ip_list)} matched IPs have peen tested.")
-    print(f"{len(selectd_ip_list)} IP(s) found:")
+    print(f"\n{total_test} of {len(ip_list)} matched IPs have been tested.")
+    print(f"{len(selected_ip_list)} IP(s) found:")
     print("|---|---------------|----------|---------|---------|----------|------------|")
     print("| # |       IP      | Ping(ms) | Jit(ms) | Lat(ms) | Up(Mbps) | Down(Mbps) |")
     print("|---|---------------|----------|---------|---------|----------|------------|")
 
     successful_no = 0
-    for el in selectd_ip_list:
+    for el in selected_ip_list:
         successful_no = successful_no + 1
-        # Print out the IP and related info as well as ping, latency and download/upload speed
+        # Print out the IP and related info as well as ping, latency, and download/upload speed
         print(f"\r|{successful_no:3d}|{el.ip:15s}| {el.ping:7d}  | {el.jitter:6d}  | {el.latency:6d}  | {el.upload:7.2f}  | {el.download:9.2f}  |")
 
     print("|---|---------------|----------|---------|---------|----------|------------|\n")
 
-    print("IP list successfuly exported to `selected-ips.csv` file.\n")
+    print("IP list successfully exported to `selected-ips.csv` file.\n")
 
-    # Updating relevant subdomain with clean IP adresses
+    # Updating relevant subdomain with clean IP addresses
     if upload_results.lower() in ["y", "yes"]:
         try:
             # Check if user wanted to delete existing records of given subdomain
@@ -248,13 +160,13 @@ def main():
                 # Get existing records of the given subdomain
                 existing_records = getCloudflareExistingRecords(email, api_key, zone_id, subdomain)
                 print("Deleting existing records...", end='', flush=True)
-                #Delete all existing records of the given subdomain
+                # Delete all existing records of the given subdomain
                 for record in existing_records:
                     deleteCloudflareExistingRecord(email, api_key, zone_id, record["id"])
                 print("Done.")
 
             print("Adding new A Record(s) for selected IP(s):")
-            for el in selectd_ip_list:
+            for el in selected_ip_list:
                 print(el.ip, end='', flush=True)
                 addNewCloudflareRecord(email, api_key, zone_id, subdomain, el.ip)
                 print(" Done.")
@@ -272,7 +184,7 @@ def startTest(stdscr: curses.window, ip_list: Pattern[AnyStr], config: configpar
     stdscr.refresh()
 
     # Initiate variables
-    selectd_ip_list = []
+    selected_ip_list = []
     test_no = 0
     successful_no = 0
     max_ip = int(config.get('DEFAULT', 'max_ip'))
@@ -290,7 +202,6 @@ def startTest(stdscr: curses.window, ip_list: Pattern[AnyStr], config: configpar
     # Creating `selected-ips.csv` file to output results
     with open('selected-ips.txt', 'w') as txt_file:
         txt_file.write("")
-
     # Print out table header if it was the first record
     stdscr.addstr(3, 0, "|---|---------------|----------|---------|---------|----------|------------|")
     stdscr.addstr(4, 0, "| # |       IP      | Ping(ms) | Jit(ms) | Lat(ms) | Up(Mbps) | Down(Mbps) |")
