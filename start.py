@@ -286,7 +286,7 @@ def startTest(stdscr: curses.window, ip_list: Pattern[AnyStr], config: configpar
             # Increase number of successful test
             successful_no = successful_no + 1
 
-            selectd_ip_list.append(IPInfo(ip, ping, jitter, latency, upload_speed, download_speed))
+            selected_ip_list.append(IPInfo(ip, ping, jitter, latency, upload_speed, download_speed))
 
             with open('selected-ips.csv', 'a') as csv_file:
                 csv_file.write(f"{successful_no},{ip},{ping},{jitter},{latency},{upload_speed},{download_speed}\n")
@@ -300,7 +300,7 @@ def startTest(stdscr: curses.window, ip_list: Pattern[AnyStr], config: configpar
             print("\r", end='', flush=True) # Nothing to do
 
         # Exit the loop if we found required number of clean IP addresses
-        if len(selectd_ip_list) >= max_ip:
+        if len(selected_ip_list) >= max_ip:
             break
 
     stdscr.move(0, 0)
@@ -311,7 +311,7 @@ def startTest(stdscr: curses.window, ip_list: Pattern[AnyStr], config: configpar
     stdscr.refresh()
     time.sleep(3)
 
-    return selectd_ip_list, test_no
+    return selected_ip_list, test_no
 
 
 class IPInfo:
